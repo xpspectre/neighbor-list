@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from utils import gen_random_atoms
+from utils import gen_random_atoms, dump_atoms
 from sklearn.metrics.pairwise import paired_distances
 from scipy.spatial.distance import pdist, squareform, cdist
 import itertools
@@ -122,9 +122,11 @@ def cell_list_neighbors(pos, cutoff):
 
 
 if __name__ == '__main__':
-    # random.seed(0)
-    N = 1000  # cell list becomes faster than simple somewher between 1000 and 5000
+    random.seed(0)
+    N = 100  # cell list becomes faster than simple somewher between 1000 and 5000
     names, pos = gen_random_atoms(N)
+
+    dump_atoms(pos, 'test_atoms.txt')
 
     cutoff = 0.5
 
@@ -154,3 +156,5 @@ if __name__ == '__main__':
     # # bounds = ((0,3), (0,3), (0,3))
     # bounds = ((0,0,0), (3,3,1))
     # neighbors = get_neighbors(cell, bounds)
+
+    1

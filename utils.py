@@ -17,6 +17,13 @@ def gen_random_atoms(N):
 
     return names, pos
 
+
+def dump_atoms(pos, filename):
+    """Dump atom coordinates to text file, each line as 3 coords, for testing C implementation"""
+    with open(filename, 'w') as f:
+        for atom in pos:
+            f.write('{}\t{}\t{}\n'.format(atom[0], atom[1], atom[2]))
+
 if __name__ == '__main__':
     N = 20
     names, pos = gen_random_atoms(N)
