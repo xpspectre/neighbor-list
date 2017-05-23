@@ -123,7 +123,7 @@ def cell_list_neighbors(pos, cutoff):
 
 if __name__ == '__main__':
     random.seed(0)
-    N = 100  # cell list becomes faster than simple somewher between 1000 and 5000
+    N = 1000  # cell list becomes faster than simple somewhere between 1000 and 5000
     names, pos = gen_random_atoms(N)
 
     dump_atoms(pos, 'test_atoms.txt')
