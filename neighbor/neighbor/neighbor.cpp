@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <math.h>
+#include "neighbor.h"
 
 using namespace std;
 
