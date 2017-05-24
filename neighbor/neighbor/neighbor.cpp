@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <math.h>
+#include <ctime>
 #include "neighbor.h"
 
 using namespace std;
@@ -24,7 +25,7 @@ vector<double> arange(double start, double stop, double step) {
 	}
 }
 
-int assign_bin(double val, vector<double> bin_edges) {
+int assign_bin(double val, const vector<double>& bin_edges) {
 	// Assign val to histogram bin, returning bin index. Leftmost bin is 0. Rightmost bin is n_bin_edges-2.
 	// Assumes bin_edge are sorted. Assumes val falls within bin_edges.
 	// Note: A binary search would be more appropriate if this were operating on larger bin_edges vectors, but linear search is OK for this.
@@ -37,37 +38,25 @@ int assign_bin(double val, vector<double> bin_edges) {
 	return -1;
 }
 
-vector<vector<int> > get_neighbor_cells(vector<int> cell, vector<vector<int> > bounds) {
-	// Get list of neighboring cells, excluding cells past the "boundary" indices
+vector<vector<int> > get_neighbor_cells(const vector<int>& cell) {
+	// Get list of neighboring cells. Don't worry about out-of-bound cells - these will be ignored in the next step.
 	vector<vector<int> > neighbors;
 	int i, j, k;
 	for (i = -1; i <= 1; ++i) {
 		for (j = -1; j <= 1; ++j) {
 			for (k = -1; k <= 1; ++k) {
 				vector<int> neighbor = cell;
-				// Check neighboring cell, skipping if it's out of bounds
 				neighbor[0] += i;
-				if (neighbor[0] < bounds[0][0] || neighbor[0] > bounds[1][0]) {
-					continue;
-				}
 				neighbor[1] += j;
-				if (neighbor[1] < bounds[0][1] || neighbor[1] > bounds[1][1]) {
-					continue;
-				}
 				neighbor[2] += k;
-				if (neighbor[2] < bounds[0][2] || neighbor[2] > bounds[1][2]) {
-					continue;
-				}
-				// Make it thru - it's a valid neighbor
 				neighbors.push_back(neighbor);
 			}
 		}
 	}
-	
 	return neighbors;
 }
 
-vector<vector<double> > cdist(vector<vector<double> > x, vector<vector<double> > y) {
+vector<vector<double> > cdist(const vector<vector<double> >& x, const vector<vector<double> >& y) {
 	// Calculate distance between points in x and points in y, outputting a matrix where x is 1st dim, y is 2nd dim
 	// Assumes 3-D points
 	int nx = x.size();
@@ -82,7 +71,7 @@ vector<vector<double> > cdist(vector<vector<double> > x, vector<vector<double> >
 	return dists;
 }
 
-vector<vector<int> > simple_neighbors(vector<vector<double> > pos, double cutoff) {
+vector<vector<int> > simple_neighbors(const vector<vector<double> >& pos, double cutoff) {
     // O(N^2) get list of each atom's neighbors within cutoff using naive method
     int N = pos.size();
 
@@ -113,7 +102,7 @@ vector<vector<int> > simple_neighbors(vector<vector<double> > pos, double cutoff
     return neighbors;
 }
 
-vector<vector<int> > cell_list_neighbors(vector<vector<double> > pos, double cutoff) {
+vector<vector<int> > cell_list_neighbors(const vector<vector<double> >& pos, double cutoff) {
 	// O(n) get list of each atom's neighbors within cutoff using Yip and Elber (1989) cell list algorithm.
 	int i, j;
 	int N = pos.size();
@@ -138,8 +127,8 @@ vector<vector<int> > cell_list_neighbors(vector<vector<double> > pos, double cut
 		size[j] = ub[j] - lb[j];
 	}
 
-	// Add in a little slack to the deges
-	double slack_mult = 1.05;
+	// Add in a little slack to the edges
+	double slack_mult = 1.01;
 	for (j = 0; j < 3; ++j) {
 		lb[j] -= (slack_mult - 1.0) * size[j];
 		ub[j] += (slack_mult - 1.0) * size[j];
@@ -147,17 +136,13 @@ vector<vector<int> > cell_list_neighbors(vector<vector<double> > pos, double cut
 
 	// Set cell size slightly larger than cutoff
 	//	This guarantees only neighboring cells need to be searched
-	double cutoff_mult = 1.1;
+	double cutoff_mult = 1.01;
 	double cell_size = cutoff * cutoff_mult;
 
 	// Divide space into cells, leaving extra space on the upper side if needed
 	vector<vector<double> > edges(3); // cell boundaries in each dim
-	vector<vector<int> > bounds(2); // lo [0] and hi [1] index of each dim's cells, inclusive
 	for (j = 0; j < 3; ++j) {
-		vector<double> bounds_i = arange(lb[j], ub[j] + cell_size, cell_size);
-		edges[j] = bounds_i;
-		bounds[0].push_back(0);
-		bounds[1].push_back(bounds_i.size() - 2);
+		edges[j] = arange(lb[j], ub[j] + cell_size, cell_size);;
 	}
 
 	// Distribute atoms to cells
@@ -191,7 +176,7 @@ vector<vector<int> > cell_list_neighbors(vector<vector<double> > pos, double cut
 		atoms = x.second;
 
 		// Get indices of neighbors
-		vector<vector<int> > neighbor_cells = get_neighbor_cells(cell, bounds);
+		vector<vector<int> > neighbor_cells = get_neighbor_cells(cell);
 		set<int> neighbor_atoms_set; // all atoms in cell and neighboring cells
 		for (i = 0; i < neighbor_cells.size(); ++i) {
 			neighbor_cell = neighbor_cells[i];
@@ -241,7 +226,7 @@ vector<vector<int> > cell_list_neighbors(vector<vector<double> > pos, double cut
 
 int main() {
     // Load test file of coordinates
-    ifstream infile("../../test_atoms.txt");
+    ifstream infile("C:/Users/xpspectre/workspace/neighbor-list/test_atoms.txt");
     string s;
     vector<vector<double> > pos;
     int i = 0;
@@ -264,11 +249,15 @@ int main() {
 
     
     double cutoff = 0.5;
+
+	clock_t start;
+	start = clock();
     //vector<vector<int> > neighbors = simple_neighbors(pos, cutoff);
 	vector<vector<int> > neighbors = cell_list_neighbors(pos, cutoff);
+	cout << "Time: " << (clock() - start) / (double)(CLOCKS_PER_SEC / 1000) << " ms" << endl;
 
     // Print out neighbor list
-    cout << "Calculated neighbor list:\n";
+    cout << "calculated neighbor list:\n";
     for (i = 0; i != neighbors.size(); ++i) {
         vector<int> neighbors_i = neighbors[i];
         string line;
