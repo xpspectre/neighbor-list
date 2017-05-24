@@ -18,41 +18,44 @@ def get_neighbors(cell, bounds):
     return neighbors[keep, :]
 
 
-def cartesian_prod(x, y):
-    """Cartesian product of 2 numpy arrays
-    See https://stackoverflow.com/questions/11144513/numpy-cartesian-product-of-x-and-y-array-points-into-single-array-of-2d-points"""
-    return np.transpose([np.tile(x, y.size), np.repeat(y, x.size)])
-
-
-def simple_neighbors(pos, cutoff):
+def simple_neighbors(pos, cutoff, max_neighbors=0):
     """O(N^2) get list of each atom's neighbors within cutoff using naive method. Mainly for comparison.
     N is the total number of atoms. Neighbor list returned as list of positions in the original pos array that are
-    within cutoff."""
+    within cutoff.
+    Use max_neighbors to specify the max_neighbors closest atoms. All are within cutoff; if there aren't enough, the
+        list will be short. max_neighbors=0 indicates don't sort and take all neighbors within cutoff."""
     N = pos.shape[0]
     n = np.arange(N, dtype=np.int32)
 
     # Calculate distances of all atoms to all atoms (actually just the lower triangle) and then filter
     # O(N^2) in both time and space but simple
-    # pairs = cartesian_prod(n, n)
-    # X = pos[pairs[:, 0], :]
-    # Y = pos[pairs[:, 1], :]
-    # dists = paired_distances(X, Y).reshape((N,N))
     dists = squareform(pdist(pos))
 
     neighbors = []
     for i in range(N):
         atom_i_dists = dists[i, :]
-        atom_i_neighbors = np.flatnonzero(atom_i_dists < cutoff)
-        atom_i_neighbors = atom_i_neighbors[atom_i_neighbors != i]  # exclude self-dist
+        within_cutoff = atom_i_dists < cutoff
+        atom_i_neighbors = np.flatnonzero(within_cutoff)
+
+        # Limit to max neighbors if specified; drop self-distance
+        if max_neighbors > 0:
+            atom_i_dists = atom_i_dists[within_cutoff]
+            sort_ind = np.argsort(atom_i_dists)
+            atom_i_neighbors = atom_i_neighbors[sort_ind][1:max_neighbors+1]
+        else:
+            atom_i_neighbors = atom_i_neighbors[atom_i_neighbors != i]
+
         neighbors.append(atom_i_neighbors)
 
     return neighbors
 
 
-def cell_list_neighbors(pos, cutoff):
+def cell_list_neighbors(pos, cutoff, max_neighbors=0):
     """O(N) get list of each atom's neighbors within cutoff using Yip and Elber (1989) cell list algorithm.
     N is the total number of atoms. Neighbor list returned as list of positions in the original pos array that are
-    within cutoff."""
+    within cutoff.
+    Use max_neighbors to specify the max_neighbors closest atoms. All are within cutoff; if there aren't enough, the
+        list will be short. max_neighbors=0 indicates don't sort and take all neighbors within cutoff."""
     N = pos.shape[0]
 
     # Set cells to enclose all atoms
@@ -60,13 +63,13 @@ def cell_list_neighbors(pos, cutoff):
     ub = np.amax(pos, axis=0)
     size = ub - lb
     # Add in a little slack to the edges
-    slack_mult = 1.05
+    slack_mult = 1.01
     lb -= (slack_mult - 1.0) * size
     ub += (slack_mult - 1.0) * size
 
     # Set cell size slightly larger than cutoff
     #   This guarantees only neighboring cells need to be searched
-    cutoff_mult = 1.1
+    cutoff_mult = 1.01
     cell_size = cutoff * cutoff_mult
 
     # Divide space into cells, leaving extra space on the upper side if needed
@@ -108,9 +111,17 @@ def cell_list_neighbors(pos, cutoff):
         dists = cdist(atom_pos, neighbor_pos)
         for i, atom in enumerate(atoms):
             atom_i_dists = dists[i, :]
-            # atom_i_neighbor_inds = np.flatnonzero(atom_i_dists < cutoff)
-            atom_i_neighbors = neighbor_atoms[atom_i_dists < cutoff]
-            atom_i_neighbors = atom_i_neighbors[atom_i_neighbors != atom]  # exclude self-dist
+            within_cutoff = atom_i_dists < cutoff
+            atom_i_neighbors = neighbor_atoms[within_cutoff]
+
+            # Limit to max neighbors if specified; drop self-distance
+            if max_neighbors > 0:
+                atom_i_dists = atom_i_dists[within_cutoff]
+                sort_ind = np.argsort(atom_i_dists)
+                atom_i_neighbors = atom_i_neighbors[sort_ind][1:max_neighbors + 1]
+            else:
+                atom_i_neighbors = atom_i_neighbors[atom_i_neighbors != atom]
+
             neighbors[atom] = atom_i_neighbors
 
     # Convert to list by original index
@@ -132,13 +143,13 @@ if __name__ == '__main__':
 
     # Simple neighbors calc
     start = time.time()
-    neighbors = simple_neighbors(pos, cutoff)
+    neighbors = simple_neighbors(pos, cutoff, max_neighbors=12)
     end = time.time()
     print(str(end - start) + 's for simple neighbors')
 
     # Cell list neighbors calc
     start = time.time()
-    neighbors_2 = cell_list_neighbors(pos, cutoff)
+    neighbors_2 = cell_list_neighbors(pos, cutoff, max_neighbors=12)
     end = time.time()
     print(str(end - start) + 's for cell list neighbors')
 
